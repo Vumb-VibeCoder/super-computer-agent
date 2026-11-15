@@ -31,8 +31,16 @@ server as a smoke test (verified on the development machine: 28 tools).
 **Canvas and pixel-grid need a license key — everything else works right away.**
 Their core is closed-source and license-gated (see [License](#license)); without a
 key, `canvas_start`/`live_start` fail with a clear error, but `screenshot` and the
-UI tree still work. To get a key, email hoanggiabao40478@gmail.com, then either:
+UI tree still work.
 
+- **Free 1-day trial key:** Email `hoanggiabao40478@gmail.com` with the subject
+  `SCA 1-day trial` (or open a quick GitHub issue / DM me on Reddit) and I will
+  send back a `.lickey` file valid for 24 hours so you can test the delta canvas
+  and pixel grid locally.
+- **Longer / commercial keys:** Email `hoanggiabao40478@gmail.com` with how many
+  machines/concurrent threads you need.
+
+Once you have the file, either set the environment variable:
 ```bat
 set SCA_LICENSE_KEY=C:\path\to\your.lickey
 ```
