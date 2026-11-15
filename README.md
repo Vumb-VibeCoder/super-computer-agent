@@ -99,6 +99,53 @@ session; set `SCA_SCREENSHOT=free` to disable it). See the last section of
 Full spec: [docs/CANVAS_PROTOCOL.md](docs/CANVAS_PROTOCOL.md). Measurements:
 [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
 
+## How it works
+
+**Canvas** (`canvas_start` -> `canvas_step`): instead of sending a full
+screenshot every time (expensive — models are billed by pixel count), it
+sends only what changed.
+
+- First call, and every time the scene changes: a **KEY** — a full image
+  (the keyframe).
+- Every call after that is just the delta needed to update the previous
+  canvas: `PATCH` (the real pixels of just the changed region, packed into a
+  small atlas), `SCROLL` (a region shifted up/down by N px), `MOVE` (a region
+  copied from elsewhere in the same frame — e.g. a dragged window), `DC` (a
+  large tile whose background color simply changed), and `RECALL` — the
+  centerpiece of v7: it remembers a handful of recently-seen scenes, so
+  alt-tabbing between two familiar windows costs a few tokens ("go back to
+  scene S\<n\>") instead of a fresh keyframe.
+- `STALE` flags tiles that may be out of date; the model should re-check
+  them with `canvas_crop` rather than trust them blindly.
+
+The frame-diffing algorithm itself (`canvas_v6`/`v7`/`delta2`/`delta3`) is
+closed-source, shipped only as a compiled `.pyd`.
+
+**Pixel grid** (`live_start`/`grid_now`/`ui_fuse`/...): a different trade-off
+— instead of a real image, the screen becomes a **grid of colored
+characters** (one character per tile, encoding hue + brightness), which is
+far cheaper for a model to read as a general layout overview than a picture.
+
+- `tree_set`/`ui_fuse` takes the Windows UI Automation tree (element names,
+  types, coordinates) and overlays index numbers onto the matching grid
+  tiles, so the model sees shape+color *and* "this tile is the Submit
+  button, index 42" at once.
+- A background thread watches for pixel changes plus Windows'
+  `SetWinEventHook` (focus, window open/close); `changes_since` /
+  `watch_until_change` / `wait_idle` report what changed and where without
+  re-capturing the whole screen on every poll.
+- `verify_action` compares the real event (pixel + OS event) against what
+  was expected (`change`/`none`/`new_window`/`close`) after a click, so the
+  model can tell "that worked as expected" from "something's off" instead of
+  assuming a click landed.
+
+This module's core is closed-source in full (not just the hot path), also
+shipped only as a compiled `.pyd`.
+
+Both cores are gated by the offline Ed25519 license check described in
+[Installation](#installation) and [License](#license); the gate runs inside
+the compiled binary itself, not only in the public wrapper around it.
+
 ## Benchmarks
 
 > Small sample sizes, not re-run for this repo, indicative only. Tokens are a
