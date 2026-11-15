@@ -1,6 +1,13 @@
 import numpy as np
 
-from super_computer_agent.canvas import canvas_v7 as v7
+from _engine import require_engine
+
+require_engine("super_computer_agent.canvas._compiled.canvas_v7")
+
+from super_computer_agent.licensing import license_slot  # noqa: E402
+
+with license_slot():
+    from super_computer_agent.canvas._compiled import canvas_v7 as v7  # noqa: E402
 
 H, W = 192, 256
 

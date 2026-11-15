@@ -1,7 +1,11 @@
 import numpy as np
 
-from super_computer_agent.host import PluginHost
-from super_computer_agent.plugins import pixel_grid
+from _engine import require_engine
+
+require_engine("super_computer_agent.plugins._compiled.pixel_grid")
+
+from super_computer_agent.host import PluginHost  # noqa: E402
+from super_computer_agent.plugins import pixel_grid  # noqa: E402
 
 
 def test_quant_gray_and_hue_letters():

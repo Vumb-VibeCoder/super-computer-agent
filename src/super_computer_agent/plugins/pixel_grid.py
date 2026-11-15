@@ -47,6 +47,7 @@ def apply(ctx):
     try:
         core = _load()
     except LicenseError as e:
-        ctx.instructions(lambda: f"pixel_grid: tắt, chưa có license hợp lệ ({e}); xem PROPRIETARY_EULA.md")
+        reason = str(e)  # `e` is deleted when the except block ends, so the lambda can't use it
+        ctx.instructions(lambda: f"pixel_grid: tắt, chưa có license hợp lệ ({reason}); xem PROPRIETARY_EULA.md")
         return
     core.apply(ctx)

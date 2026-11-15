@@ -3,11 +3,14 @@ import os
 import numpy as np
 import pytest
 
+from _engine import require_engine
 from super_computer_agent.plugins import canvas_live
 
 
 @pytest.fixture
 def live(tmp_path, monkeypatch):
+    require_engine("super_computer_agent.canvas._compiled.canvas_v7",
+                   "super_computer_agent.canvas._compiled.canvas_delta2", module_level=False)
     monkeypatch.setattr(canvas_live, "OUT", str(tmp_path / "canvas"))
     canvas_live.start(max_side=512, settle_ms=0)
     yield canvas_live

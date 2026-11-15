@@ -5,16 +5,21 @@ import pytest
 
 pytest.importorskip("mcp")
 
+from _engine import engine_status  # noqa: E402
 from super_computer_agent import server  # noqa: E402
 
-EXPECTED = {"screenshot", "ui_list_windows", "ui_get_tree", "view_image", "ui_fuse", "live_start", "grid_now",
+EXPECTED = {"screenshot", "ui_list_windows", "ui_get_tree", "view_image",
             "canvas_start", "canvas_step", "canvas_crop", "canvas_status", "canvas_stop"}
+# registered by the closed-source pixel_grid engine, so only present where it can load
+PIXEL_GRID_TOOLS = {"ui_fuse", "live_start", "grid_now"}
 
 
 def test_tool_surface_is_observation_only():
     tools = asyncio.run(server.build_server().list_tools())
     names = {t.name for t in tools}
     assert EXPECTED <= names
+    if engine_status("super_computer_agent.plugins._compiled.pixel_grid") is None:
+        assert PIXEL_GRID_TOOLS <= names
     assert not {"ui_click", "ui_type", "ui_key", "ui_scroll", "ui_set_value"} & names
     assert len(names) == len(tools)  # no duplicate names
 
