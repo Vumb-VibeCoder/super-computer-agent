@@ -28,6 +28,17 @@ super-computer-agent doctor
 `doctor` checks dependencies, takes a trial screenshot, and spins up the
 server as a smoke test (verified on the development machine: 28 tools).
 
+**Canvas and pixel-grid need a license key — everything else works right away.**
+Their core is closed-source and license-gated (see [License](#license)); without a
+key, `canvas_start`/`live_start` fail with a clear error, but `screenshot` and the
+UI tree still work. To get a key, email hoanggiabao40478@gmail.com, then either:
+
+```bat
+set SCA_LICENSE_KEY=C:\path\to\your.lickey
+```
+
+or drop the file at the default path `%USERPROFILE%\.super-computer-agent\license.lickey`.
+
 ## Running
 
 ```bat
@@ -134,9 +145,11 @@ src/super_computer_agent/
   coordination.py                   priority tiering, NEXT hints, screenshot guard-rail
   uia.py                            UI Automation tree (read-only)
   screenshot.py                     desktop capture
-  plugins/pixel_grid.py             color grid + change log + tree fusion
-  plugins/canvas_live.py            canvas delta session (serialize, crop)
-  canvas/canvas_delta2|3|v6|v7.py   delta-compression algorithm, v7 = v6 + scene recall
+  licensing/                        offline Ed25519 license-key check (public key only)
+  plugins/canvas_live.py            canvas delta session (serialize, crop) — public, AGPL-3.0
+  plugins/pixel_grid.py             thin loader for the compiled pixel_grid core — public, AGPL-3.0
+  canvas/_compiled/*.pyd            canvas_v6/v7/delta2/delta3 — compiled, proprietary
+  plugins/_compiled/pixel_grid.pyd  pixel_grid core — compiled, proprietary
 tests/   docs/
 ```
 
