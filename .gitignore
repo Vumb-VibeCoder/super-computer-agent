@@ -1,0 +1,26 @@
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+.pytest_cache/
+.env
+outputs/
+
+# --- proprietary canvas/pixel_grid packaging ---
+# The licensor-side tool (keygen + key issuer + private signing key +
+# the real plaintext source of canvas_v7/v6/delta2/delta3/pixel_grid) is
+# internal-only: never push this folder to the public repo. The public
+# repo only ever contains the thin wrapper .py files (AGPL-3.0) plus the
+# compiled _compiled/*.pyd binaries.
+licensor-tools/
+
+# Issued license keys (per-customer secrets) must not be committed either.
+*.lickey
+
+# Nuitka build scratch (intermediate C sources, crash dumps) — not for public repo.
+build_core/
+nuitka-crash-report.xml

@@ -1,0 +1,31 @@
+super-computer-agent
+Copyright (C) 2026 asa <hoanggiabao40478@gmail.com>
+
+This project is dual-licensed by component.
+
+1) EVERYTHING EXCEPT the two modules listed in (2) below is licensed under
+   the GNU Affero General Public License v3.0 (AGPL-3.0). See LICENSE.
+   This covers: cli.py, server.py, host.py, coordination.py, uia.py,
+   screenshot.py, the MCP tool definitions, plugins/canvas_live.py (the
+   session/serialize/crop wrapper, as distinct from the delta algorithm
+   it calls), tests, and docs.
+
+2) The delta-compression core algorithm and the pixel-grid core algorithm:
+
+     - src/super_computer_agent/canvas/canvas_v7.py  (and canvas_v6.py,
+       canvas_delta2.py, canvas_delta3.py as its predecessor revisions)
+     - src/super_computer_agent/plugins/pixel_grid.py
+
+   are PROPRIETARY and are NOT released under the AGPL-3.0. Their source
+   is not published in this repository. They are distributed only as
+   pre-compiled binaries (.pyd on Windows / .so on Linux) together with
+   an offline signature check, and are governed exclusively by the terms
+   in PROPRIETARY_EULA.md. No AGPL-3.0 rights (copying, modification,
+   redistribution of source, etc.) extend to these two modules.
+
+Reverse engineering, decompiling, or disassembling the binaries referred
+to in (2) is prohibited except to the extent such restriction is
+unenforceable under applicable law (e.g. interoperability exceptions in
+your jurisdiction).
+
+Questions about licensing: hoanggiabao40478@gmail.com
