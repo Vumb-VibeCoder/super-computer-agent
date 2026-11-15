@@ -99,6 +99,25 @@ session; set `SCA_SCREENSHOT=free` to disable it). See the last section of
 Full spec: [docs/CANVAS_PROTOCOL.md](docs/CANVAS_PROTOCOL.md). Measurements:
 [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
 
+## Benchmarks
+
+> Small sample sizes, not re-run for this repo, indicative only. Tokens are a
+> pixels/750 estimate, not real API usage. Full numbers and methodology:
+> [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
+
+| Measurement | Result |
+|---|---|
+| 9 canvas steps vs. full images (Chromium browser) | ~3256 tok vs. ~11,800 tok |
+| Real task: 10 rows entered into a Google Sheet | ~3263 tok vs. ~7870 tok (full screenshots) |
+| Blind reading accuracy, canvas vs. full image | 18/18 vs. 10/12 and 8/9 (across 2 separate seeds) |
+| 6 canvas steps vs. 4 full images | ~2203 tok vs. ~6360 tok |
+| Latency (dev machine) | capture ~62 ms, encoding ~90-114 ms |
+| RECALL (alt-tab back to a known scene) | 3-15 tok, vs. a fresh keyframe |
+
+Conclusion: canvas reads about as well as a plain screenshot and is cheaper
+for small incremental changes, but is still **beta** — ship it opt-in, not
+as the only path.
+
 ## Security
 
 - No tool controls the mouse or keyboard. `test_server.py` asserts this.
