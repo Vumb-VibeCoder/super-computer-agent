@@ -1,4 +1,4 @@
-# super-computer-agent
+# super-computer-vision
 
 A **read-only, observation-only** MCP server for Windows that bundles four
 screen-observation capabilities into one package — it never clicks or types
