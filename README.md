@@ -18,11 +18,11 @@ anything.
 Requires Windows 10/11 and Python >= 3.10.
 
 ```bat
-git clone <repo> super-computer-agent
-cd super-computer-agent
+git clone <repo> super-computer-vision
+cd super-computer-vision
 python -m venv .venv && .venv\Scripts\activate
 pip install -e ".[dev]"
-super-computer-agent doctor
+super-computer-vision doctor
 ```
 
 `doctor` checks dependencies, takes a trial screenshot, and spins up the
