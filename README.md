@@ -214,7 +214,7 @@ set SCA_INTEGRATION=1 && python -m pytest -q -m integration   :: adds 1 test tha
 ## Structure
 
 ```
-src/super_computer_agent/
+src/super_computer_vision/
   cli.py  server.py  host.py        CLI, MCP server, plugin adapter
   coordination.py                   priority tiering, NEXT hints, screenshot guard-rail
   uia.py                            UI Automation tree (read-only)
