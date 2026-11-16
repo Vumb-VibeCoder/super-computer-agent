@@ -1,4 +1,4 @@
-# super-computer-vision
+# super-computer-agent
 
 A **read-only, observation-only** MCP server for Windows that bundles four
 screen-observation capabilities into one package — it never clicks or types
@@ -18,11 +18,11 @@ anything.
 Requires Windows 10/11 and Python >= 3.10.
 
 ```bat
-git clone <repo> super-computer-vision
-cd super-computer-vision
+git clone <repo> super-computer-agent
+cd super-computer-agent
 python -m venv .venv && .venv\Scripts\activate
 pip install -e ".[dev]"
-super-computer-vision doctor
+super-computer-agent doctor
 ```
 
 `doctor` checks dependencies, takes a trial screenshot, and spins up the
@@ -214,7 +214,7 @@ set SCA_INTEGRATION=1 && python -m pytest -q -m integration   :: adds 1 test tha
 ## Structure
 
 ```
-src/super_computer_vision/
+src/super_computer_agent/
   cli.py  server.py  host.py        CLI, MCP server, plugin adapter
   coordination.py                   priority tiering, NEXT hints, screenshot guard-rail
   uia.py                            UI Automation tree (read-only)
