@@ -10,13 +10,14 @@ def _doctor() -> int:
     import importlib
     ok = True
     print(f"super-computer-agent {__version__} | python {sys.version.split()[0]} | {sys.platform}")
-    for mod, why in (("numpy", "grid + canvas"), ("PIL", "images"), ("cv2", "canvas (opencv-python)"),
-                     ("mss", "fast capture"), ("mcp", "MCP server"), ("pywinauto", "UI tree (Windows only)")):
+    for mod, why in (("numpy", "grid + fovea"), ("PIL", "images"),
+                     ("mss", "fast capture"), ("mcp", "MCP server"), ("pywinauto", "UI tree (Windows only)"),
+                     ("uiautomation", "fovea UIA signature (Windows only)")):
         try:
             m = importlib.import_module(mod)
             print(f"  ok       {mod:10s} {getattr(m, '__version__', '')}  ({why})")
         except Exception as exc:
-            required = not (mod == "pywinauto" and sys.platform != "win32")
+            required = not (mod in ("pywinauto", "uiautomation") and sys.platform != "win32")
             ok &= not required
             print(f"  {'MISSING ' if required else 'skipped '} {mod:10s} ({why}): {exc}")
     try:

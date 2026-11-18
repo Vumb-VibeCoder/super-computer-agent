@@ -1,6 +1,6 @@
 numpy>=1.26
 pillow>=10.4
-opencv-python>=4.9
 mss>=9.0
 mcp>=1.2,<2
 pywinauto==0.6.9; sys_platform == "win32"
+uiautomation>=2.0; sys_platform == "win32"

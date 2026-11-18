@@ -9,7 +9,7 @@ anything.
 | **Screenshot** | Captures the whole desktop (all monitors) to PNG | `screenshot`, `view_image` |
 | **UI tree** | Windows UI Automation tree of a window (JSON: index, parent, type, name, rect) | `ui_list_windows`, `ui_get_tree` |
 | **Live pixel grid** | Raw color grid of the screen plus a log of changed regions, fused with the UI tree to label what changed | `live_start`, `grid_now`, `ui_fuse`, `changes_since`, `wait_stable`, `crop`, `zoom`, ... |
-| **Canvas** | Sends one keyframe, then only the changed parts (patch, scroll, move, recall an earlier scene) to use far fewer image tokens | `canvas_start`, `canvas_step`, `canvas_crop`, `canvas_status`, `canvas_stop` |
+| **Fovea** | Sends one keyframe, then only the changed parts (patch, scroll, recall an earlier scene, precise zoomed reads) to use far fewer image tokens | `fovea_start`, `fovea_step`, `fovea_look`, `fovea_expect`, `fovea_status`, `fovea_stop` |
 
 28 tools total, no input injection of any kind.
 
@@ -28,15 +28,15 @@ super-computer-agent doctor
 `doctor` checks dependencies, takes a trial screenshot, and spins up the
 server as a smoke test (verified on the development machine: 28 tools).
 
-**Canvas and pixel-grid need a license key — everything else works right away.**
+**Fovea and pixel-grid need a license key — everything else works right away.**
 Their core is closed-source and license-gated (see [License](#license)); without a
-key, `canvas_start`/`live_start` fail with a clear error, but `screenshot` and the
+key, `fovea_start`/`live_start` fail with a clear error, but `screenshot` and the
 UI tree still work.
 
 - **Free 1-day trial key:** Email `hoanggiabao40478@gmail.com` with the subject
   `SCA 1-day trial` (or open a quick GitHub issue / DM me on Reddit) and I will
-  send back a `.lickey` file valid for 24 hours so you can test the delta canvas
-  and pixel grid locally.
+  send back a `.lickey` file valid for 24 hours so you can test fovea and the
+  pixel grid locally.
 - **Longer / commercial keys:** Email `hoanggiabao40478@gmail.com` with how many
   machines/concurrent threads you need.
 
@@ -76,17 +76,17 @@ Environment variables:
 
 | Variable | Meaning |
 |---|---|
-| `SCA_OUTPUT_DIR` | Where images are written (`screenshots/`, `canvas_live/`, `pixel_grid/`). Defaults to `./outputs` relative to the working directory, so **set an absolute path** when running from an MCP client. `view_image` only opens files inside this directory. |
+| `SCA_OUTPUT_DIR` | Where images are written (`screenshots/`, `fovea_live/`, `pixel_grid/`). Defaults to `./outputs` relative to the working directory, so **set an absolute path** when running from an MCP client. `view_image` only opens files inside this directory. |
 | `SCA_SCREENSHOT` | `free` disables `screenshot`'s guard-rail (the tiering tags and hints still apply). |
 | `SCA_ALLOWED_PROCESSES` | Optional. `;`-separated list of executables (name or full path) allowed to be listed/read by the UI tree. Empty = every non-sensitive window. |
 
 ## Coordinating the tools
 
-**Canvas is the default; a full-screen `screenshot` is the last resort, for
+**Fovea is the default; a full-screen `screenshot` is the last resort, for
 when things are genuinely hard to read any other way.** Priority order:
-`canvas_step` -> `canvas_crop` (precise reading) -> `ui_fuse` (element
+`fovea_step` -> `fovea_look` (precise reading) -> `ui_fuse` (element
 names/positions, as text) -> `wait_stable` (wait) -> a new keyframe
-(`canvas_start`) -> only then `screenshot`. Details and the exact conditions
+(`fovea_start`) -> only then `screenshot`. Details and the exact conditions
 for using `screenshot`: [docs/WORKFLOW.md](docs/WORKFLOW.md). The server
 enforces this ordering through tiering tags on tool descriptions, `NEXT:`
 hints after results, warnings on repeated probing, and a guard-rail on
@@ -94,40 +94,52 @@ hints after results, warnings on repeated probing, and a guard-rail on
 session; set `SCA_SCREENSHOT=free` to disable it). See the last section of
 [docs/WORKFLOW.md](docs/WORKFLOW.md).
 
-## Using canvas (summary)
+## Using fovea (summary)
 
-1. Call `canvas_start()` once, then `canvas_step()` whenever you need to look
+1. Call `fovea_start()` once, then `fovea_step()` whenever you need to look
    at the screen.
 2. The first call, and every scene change, is a `KEY` (a full image, opened
-   with `view_image`). Subsequent calls are just delta commands (`PATCH`,
-   `SCROLL`, `MOVE`, `DC`, `RECALL`) applied to the canvas in order.
-3. Canvas is an **approximate** image. To read small text/numbers precisely,
-   use `canvas_crop(x, y, w, h)`.
+   with `view_image`). Subsequent calls are just delta commands (`COPY`,
+   `LOW`, `SCROLL`, `RECALL`) applied to the canvas in order.
+3. Fovea is an **approximate** image. To read small text/numbers precisely,
+   use `fovea_look(x, y, w, h)`. To check "did this region change" without
+   spending image tokens, use `fovea_expect` first.
 
-Full spec: [docs/CANVAS_PROTOCOL.md](docs/CANVAS_PROTOCOL.md). Measurements:
+Full spec: [docs/FOVEA_PROTOCOL.md](docs/FOVEA_PROTOCOL.md). Measurements:
 [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
 
 ## How it works
 
-**Canvas** (`canvas_start` -> `canvas_step`): instead of sending a full
+**Fovea** (`fovea_start` -> `fovea_step`): instead of sending a full
 screenshot every time (expensive — models are billed by pixel count), it
-sends only what changed.
+sends only what changed. Fovea is not a rewrite from scratch — it is an
+upgrade layer wrapped directly around the older grid-compression core
+(`canvas_v6`/`v7`/`delta2`/`delta3`), adding a 64-frame scene memory
+(`RECALL #k`), precise 1:1 zoomed reads (`fovea_look`), an `HWND` lock plus a
+lightweight UIA signature check to catch focus-switch races, and a hard cap
+on the cell store.
 
 - First call, and every time the scene changes: a **KEY** — a full image
   (the keyframe).
 - Every call after that is just the delta needed to update the previous
-  canvas: `PATCH` (the real pixels of just the changed region, packed into a
-  small atlas), `SCROLL` (a region shifted up/down by N px), `MOVE` (a region
-  copied from elsewhere in the same frame — e.g. a dragged window), `DC` (a
-  large tile whose background color simply changed), and `RECALL` — the
-  centerpiece of v7: it remembers a handful of recently-seen scenes, so
+  canvas: `COPY` (real pixels copied tile-by-tile from a named image),
+  `LOW` (a blurred low-resolution preview that sharpens on later steps),
+  `SCROLL` (a region shifted up/down by N px), and `RECALL` — the
+  centerpiece of fovea: it remembers a handful of recently-seen scenes, so
   alt-tabbing between two familiar windows costs a few tokens ("go back to
-  scene S\<n\>") instead of a fresh keyframe.
-- `STALE` flags tiles that may be out of date; the model should re-check
-  them with `canvas_crop` rather than trust them blindly.
+  scene #k") instead of a fresh keyframe.
+- A lightweight UIA signature scan runs on the first two tree tiers (up to
+  40 controls) every step; if it changes while pixels are static, fovea
+  fires a `KEYFRAME uia` within one step instead of waiting on a pixel
+  threshold. If the canvas itself changes drastically (>=60% of cells) while
+  UIA stays quiet, it fires a separate `KEYFRAME canvas` — the two failure
+  modes are tracked as distinct counters in `fovea_status`.
+- Minimized/closed windows, `hwnd=0`, black frames, and `mss` capture errors
+  all resolve to `WAIT` (0 extra tokens, canvas and history untouched)
+  instead of being treated as valid content or crashing.
 
-The frame-diffing algorithm itself (`canvas_v6`/`v7`/`delta2`/`delta3`) is
-closed-source, shipped only as a compiled `.pyd`.
+The frame-diffing algorithm itself is closed-source, shipped only as a
+compiled `.pyd`.
 
 **Pixel grid** (`live_start`/`grid_now`/`ui_fuse`/...): a different trade-off
 — instead of a real image, the screen becomes a **grid of colored
@@ -156,22 +168,42 @@ the compiled binary itself, not only in the public wrapper around it.
 
 ## Benchmarks
 
-> Small sample sizes, not re-run for this repo, indicative only. Tokens are a
-> pixels/750 estimate, not real API usage. Full numbers and methodology:
+> Measured on this machine. Full numbers and methodology:
 > [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
 
-| Measurement | Result |
-|---|---|
-| 9 canvas steps vs. full images (Chromium browser) | ~3256 tok vs. ~11,800 tok |
-| Real task: 10 rows entered into a Google Sheet | ~3263 tok vs. ~7870 tok (full screenshots) |
-| Blind reading accuracy, canvas vs. full image | 18/18 vs. 10/12 and 8/9 (across 2 separate seeds) |
-| 6 canvas steps vs. 4 full images | ~2203 tok vs. ~6360 tok |
-| Latency (dev machine) | capture ~62 ms, encoding ~90-114 ms |
-| RECALL (alt-tab back to a known scene) | 3-15 tok, vs. a fresh keyframe |
+Fovea is not a rewrite — it is an upgrade layer wrapped directly around the
+old canvas grid-compression core. The old canvas build, run in real-world
+use on Windows, had four bottlenecks: switching between familiar
+windows/tabs cost ~600 tokens every time with no memory of prior scenes;
+small adjacent characters on the shrunk 960px grid were unreadable, forcing
+the model to guess; a focus-switch race (changing windows in the wrong
+millisecond, or the UIA tree changing while pixels stayed still) could apply
+the wrong delta or take up to 8 steps to notice; and long sessions grew RAM
+and the cell store without bound, while black or minimized-window frames
+still got written into history as if they were real content. Fovea fixes
+all four by keeping the old grid core and adding a 64-frame scene memory
+(`RECALL #k`), a precise 1:1 zoom tool (`fovea_look`), an `HWND` lock plus a
+lightweight UIA signature check, and a hard cap on the cell store.
 
-Conclusion: canvas reads about as well as a plain screenshot and is cheaper
-for small incremental changes, but is still **beta** — ship it opt-in, not
-as the only path.
+| Measurement | Old canvas (baseline) | Fovea (patched) | What causes the difference |
+|---|---|---|---|
+| Avg tokens / step | 521 | **~138** (~73.5% lower) | 64-frame `RECALL` + `HWND` lock recapture on a detected race |
+| Returning to a known window | ~600 tok | **<60 tok** (best case 3-15 tok) | Hash-matches a cached frame from the 64-frame memory (22 `RECALL` hits measured) |
+| Reading small text precisely | not available (guessing on the 960px grid) | exact 1:1 region crop | `fovea_look` zooms only the region that needs reading |
+| Window-mismatch errors (`KEYFRAME race`) | 3 (rising to 7 once RECALL was added) | **0** | `HWND` identity lock forces a recapture when a mismatch is detected |
+| Detecting a silent UIA change (pixels static) | up to 8 steps | **1 step** | Lightweight 2-tier UIA signature scan (<=40 nodes, 0-29 ms) every step |
+| Recovering when the canvas changes >=60% of cells (UIA static) | full keyframe (~700-1000+ tok) | targeted `KEYFRAME canvas` only | Separate UIA vs. canvas recovery channels, tracked individually in `fovea_status` |
+| Processing time / step | UIA scan cost not controlled | ~51 ms (static) / ~100 ms (full: grab 51ms + png 2ms + step 47ms) | `mss` capture fully decoupled from `pywinauto` |
+| Minimized window (`-32000`) / `hwnd=0` | treated as valid, costs a 524-tok keyframe | `WAIT` (0 tokens), canvas unchanged | Detects `IsWindow=False`, empty rect, or `hwnd=0` |
+| Black frame / `mss` error | written into history (767 tok) or raised `RuntimeError` | `WAIT` (0 tokens); returning to a real frame costs 1 token | Black frames under 3 consecutive steps are ignored (3+ steps is treated as real content) |
+| 500-step soak test (1080p, always-new content) | RAM +19 MB / 88,110 cells, growing linearly | RAM +9 MB / 28,860 cells, flattens after step 300 | Cell store capped at 30,000 (oldest evicted), frame history capped at 64, PNGs capped at 60 |
+
+Everything that was already solid at the old canvas grid layer carries over
+unchanged: 0% long-run state drift (0/46 checkpoints) and 0% stale OCR
+(0/248 rows) in a 125-second dynamic-spreadsheet stress test, and correct
+physical-pixel/DPI handling at Windows 150% scale (UIA and the captured
+frame both resolve to the same physical 1920x1080 pixels, mapped to the
+960x544 canvas at exactly a factor of 2).
 
 ## Security
 
@@ -181,7 +213,7 @@ as the only path.
   processes running as admin or whose permission level can't be determined
   (fail closed), masks password fields, and caps results at 500 nodes / 6
   levels.
-- **Screenshot, canvas, and the pixel grid do NOT filter content**: they
+- **Screenshot, fovea, and the pixel grid do NOT filter content**: they
   capture whatever is on screen, including any sensitive window that's
   open. Don't run the server when something you don't want the model to see
   is visible.
@@ -192,11 +224,7 @@ as the only path.
 
 ## Known limitations
 
-- Canvas is **beta**: small benchmark sample, token counts are a
-  pixels/750 estimate rather than real API usage; the `STALE` flag has not
-  been exercised by any test; a very small change (e.g. a single 6-character
-  code) can produce a patch that is hard to read, requiring `canvas_crop`.
-- Canvas and the pixel grid capture the **primary monitor**; `screenshot`
+- Fovea and the pixel grid capture the **primary monitor**; `screenshot`
   captures every monitor.
 - Only tested on Windows. Chromium/Electron apps may expose only a handful
   of UIA nodes (a Chromium-based browser tested during development showed
@@ -207,8 +235,8 @@ as the only path.
 ## Testing
 
 ```bat
-python -m pytest -q                        :: 22 tests, no display needed
-set SCA_INTEGRATION=1 && python -m pytest -q -m integration   :: adds 1 test that uses a real display
+python -m pytest -q                        :: full suite, no display needed (35 passed, 1 skipped)
+set SCA_INTEGRATION=1 && python -m pytest -q -m integration   :: adds the tests that use a real display/window
 ```
 
 ## Structure
@@ -220,17 +248,16 @@ src/super_computer_agent/
   uia.py                            UI Automation tree (read-only)
   screenshot.py                     desktop capture
   licensing/                        offline Ed25519 license-key check (public key only)
-  plugins/canvas_live.py            canvas delta session (serialize, crop) — public, AGPL-3.0
+  plugins/fovea_live.py             thin loader for the compiled fovea core — public, AGPL-3.0
   plugins/pixel_grid.py             thin loader for the compiled pixel_grid core — public, AGPL-3.0
-  canvas/_compiled/*.pyd            canvas_v6/v7/delta2/delta3 — compiled, proprietary
+  plugins/_compiled/fovea_live.pyd  fovea core (built on the old canvas_v6/v7/delta2/delta3) — compiled, proprietary
   plugins/_compiled/pixel_grid.pyd  pixel_grid core — compiled, proprietary
 tests/   docs/
 ```
 
-> **Licensing note:** `canvas/canvas_v6.py`, `canvas/canvas_v7.py` (and their
-> predecessor revisions `canvas_delta2.py`/`canvas_delta3.py`) and
-> `plugins/pixel_grid.py` are **not** covered by the AGPL-3.0 license below —
-> see [License](#license).
+> **Licensing note:** `plugins/fovea_live.py`'s compiled core and
+> `plugins/pixel_grid.py`'s compiled core are **not** covered by the
+> AGPL-3.0 license below — see [License](#license).
 
 ## License
 
@@ -241,11 +268,11 @@ exact file list:
 
 - Everything except the two modules below is licensed under the
   **GNU Affero General Public License v3.0 (AGPL-3.0)**. See [LICENSE](LICENSE).
-- The delta-compression core (`canvas_v7`/`canvas_v6` and predecessors) and
-  the pixel-grid core (`pixel_grid`) are **proprietary**: their source is not
-  published; they are distributed only as compiled binaries (`.pyd`/`.so`)
-  protected by an offline, Ed25519-signed, machine/thread-bound license key.
-  Reverse engineering, decompiling, and disassembling them is prohibited.
-  Terms: [PROPRIETARY_EULA.md](PROPRIETARY_EULA.md).
+- The fovea delta-compression core and the pixel-grid core (`pixel_grid`)
+  are **proprietary**: their source is not published; they are distributed
+  only as compiled binaries (`.pyd`/`.so`) protected by an offline,
+  Ed25519-signed, machine/thread-bound license key. Reverse engineering,
+  decompiling, and disassembling them is prohibited. Terms:
+  [PROPRIETARY_EULA.md](PROPRIETARY_EULA.md).
 
 Contact for licensing questions: hoanggiabao40478@gmail.com

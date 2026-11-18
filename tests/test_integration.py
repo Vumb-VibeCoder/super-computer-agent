@@ -7,15 +7,17 @@ pytestmark = [pytest.mark.integration,
               pytest.mark.skipif(os.environ.get("SCA_INTEGRATION") != "1", reason="set SCA_INTEGRATION=1")]
 
 
-def test_real_screenshot_and_canvas_steps(tmp_path, monkeypatch):
+def test_real_screenshot_and_fovea_steps(tmp_path, monkeypatch):
     from super_computer_agent import screenshot
-    from super_computer_agent.plugins import canvas_live
-    monkeypatch.setattr(canvas_live, "OUT", str(tmp_path / "canvas"))   # OUT is read at import time
+    from _engine import require_engine
+    require_engine("super_computer_agent.plugins._compiled.fovea_live", module_level=False)
+    from super_computer_agent.plugins._compiled import fovea_live
+    monkeypatch.setattr(fovea_live, "OUT", str(tmp_path / "fovea"))   # OUT is read at import time
     w, h = screenshot.grab().size
     assert w > 0 and h > 0
-    canvas_live.start(settle_ms=0)
+    fovea_live.start(settle_ms=0)
     try:
-        first, _, _ = canvas_live.step_frame(canvas_live._grab())
-        assert "KEY" in first
+        out = fovea_live.step_frame(fovea_live._grab())
+        assert out and "CANVAS" in str(out)
     finally:
-        canvas_live.stop()
+        fovea_live.stop()
